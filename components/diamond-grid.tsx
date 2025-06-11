@@ -5,9 +5,10 @@ import { motion } from "framer-motion"
 
 interface Player {
   id: number
+  playerNumber: number
   name: string
   avatar: string
-  isAlive: boolean
+  isEliminated: boolean
   eliminatedAt?: number
 }
 
@@ -67,18 +68,18 @@ export function DiamondGrid({ players, eliminatingPlayer }: DiamondGridProps) {
                 const index = rowIndex * dimensions.columns + colIndex
                 if (index >= 100) return null
 
-                const playerId = index + 1
-                const player = players.find((p) => p.id === playerId)
-                const isEliminating = eliminatingPlayer === playerId
+                const playerNumber = index + 1
+                const player = players.find((p) => p.playerNumber === playerNumber)
+                const isEliminating = eliminatingPlayer === playerNumber
 
                 return (
                   <motion.div
-                    key={`diamond-${playerId}`}
+                    key={`diamond-${playerNumber}`}
                     initial={{ opacity: 0, scale: 0 }}
                     animate={{
                       opacity: 1,
                       scale: 1,
-                      filter: player?.isAlive === false ? "grayscale(100%)" : "grayscale(0%)",
+                      filter: player?.isEliminated ? "grayscale(100%)" : "grayscale(0%)",
                     }}
                     transition={{
                       delay: index * 0.02,
@@ -94,7 +95,7 @@ export function DiamondGrid({ players, eliminatingPlayer }: DiamondGridProps) {
                     {/* Diamond shape */}
                     <div
                       className={`absolute inset-2 transform rotate-45 border-2 transition-all duration-500 ${
-                        player?.isAlive === false
+                        player?.isEliminated
                           ? "border-red-500 bg-red-900/30"
                           : player
                             ? "border-green-400 bg-pink-900/20"
@@ -120,19 +121,19 @@ export function DiamondGrid({ players, eliminatingPlayer }: DiamondGridProps) {
                               }
                               alt={player.name}
                               className={`w-full h-full object-cover rounded-full transition-all duration-500 ${
-                                player.isAlive === false ? "opacity-60" : ""
+                                player.isEliminated ? "opacity-60" : ""
                               } ${isEliminating ? "animate-bounce" : ""}`}
                             />
                           </div>
                           <div
                             className={`font-mono font-bold digital-font transition-all duration-500 ${
-                              player.isAlive === false ? "text-red-500" : "text-green-400"
+                              player.isEliminated ? "text-red-500" : "text-green-400"
                             }`}
                             style={{
                               fontSize: `${dimensions.size * 0.12}px`,
                             }}
                           >
-                            {playerId.toString().padStart(3, "0")}
+                            {playerNumber.toString().padStart(3, "0")}
                           </div>
                         </>
                       ) : (
@@ -142,7 +143,7 @@ export function DiamondGrid({ players, eliminatingPlayer }: DiamondGridProps) {
                             fontSize: `${dimensions.size * 0.12}px`,
                           }}
                         >
-                          {playerId.toString().padStart(3, "0")}
+                          {playerNumber.toString().padStart(3, "0")}
                         </div>
                       )}
                     </div>

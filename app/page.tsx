@@ -11,9 +11,10 @@ import { DiamondGrid } from "@/components/diamond-grid"
 
 interface Player {
   id: number
+  playerNumber: number
   name: string
   avatar: string
-  isAlive: boolean
+  isEliminated: boolean
   eliminatedAt?: number
 }
 
@@ -28,32 +29,29 @@ export default function SquidGameElimination() {
   const [newPlayerAvatar, setNewPlayerAvatar] = useState("")
   const [eliminatingPlayer, setEliminatingPlayer] = useState<number | null>(null)
 
-  // Load data from localStorage on mount
+  // Load data from API on mount
   useEffect(() => {
-    const savedPlayers = localStorage.getItem("squidGamePlayers")
-    const savedCurrentPlayer = localStorage.getItem("squidGameCurrentPlayer")
+    const fetchPlayers = async () => {
+      try {
+        const response = await fetch('/api/players');
+        const data = await response.json();
+        setPlayers(data);
+      } catch (error) {
+        console.error('Failed to fetch players:', error);
+      }
+    };
 
-    if (savedPlayers) {
-      setPlayers(JSON.parse(savedPlayers))
-    }
+    fetchPlayers();
+  }, []);
+
+  // Load current player from localStorage on mount
+  useEffect(() => {
+    const savedCurrentPlayer = localStorage.getItem("squidGameCurrentPlayer")
     if (savedCurrentPlayer) {
       setCurrentPlayer(JSON.parse(savedCurrentPlayer))
       setMode("player")
     }
   }, [])
-
-  // Save to localStorage whenever players change
-  useEffect(() => {
-    if (players.length > 0) {
-      localStorage.setItem("squidGamePlayers", JSON.stringify(players))
-    }
-  }, [players])
-
-  useEffect(() => {
-    if (currentPlayer) {
-      localStorage.setItem("squidGameCurrentPlayer", JSON.stringify(currentPlayer))
-    }
-  }, [currentPlayer])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -66,28 +64,30 @@ export default function SquidGameElimination() {
     }
   }
 
-  const registerPlayer = () => {
+  const registerPlayer = async () => {
     if (!newPlayerName.trim()) return
 
-    const existingPlayer = players.find((p) => p.name === newPlayerName.trim())
-    if (existingPlayer) {
-      setCurrentPlayer(existingPlayer)
-      setMode("player")
-      return
-    }
+    try {
+      const response = await fetch('/api/players', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newPlayerName.trim(),
+          avatar: newPlayerAvatar || "/placeholder.svg?height=100&width=100",
+        }),
+      });
 
-    const newId = players.length > 0 ? Math.max(...players.map((p) => p.id)) + 1 : 1
-    const newPlayer: Player = {
-      id: newId,
-      name: newPlayerName.trim(),
-      avatar: newPlayerAvatar || "/placeholder.svg?height=100&width=100",
-      isAlive: true,
+      const newPlayer = await response.json();
+      setPlayers(prev => [...prev, newPlayer]);
+      setCurrentPlayer(newPlayer);
+      localStorage.setItem("squidGameCurrentPlayer", JSON.stringify(newPlayer));
+      setMode("player");
+    } catch (error) {
+      console.error('Failed to register player:', error);
+      alert('Failed to register player. Please try again.');
     }
-
-    const updatedPlayers = [...players, newPlayer]
-    setPlayers(updatedPlayers)
-    setCurrentPlayer(newPlayer)
-    setMode("player")
   }
 
   const handleOperatorLogin = () => {
@@ -100,38 +100,57 @@ export default function SquidGameElimination() {
     }
   }
 
-  const eliminatePlayer = () => {
-    const playerId = Number.parseInt(eliminationTarget)
-    if (isNaN(playerId) || playerId < 1 || playerId > 100) {
+  const eliminatePlayer = async () => {
+    const playerNumber = Number.parseInt(eliminationTarget)
+    if (isNaN(playerNumber) || playerNumber < 1 || playerNumber > 100) {
       alert("Please enter a valid player number (1-100)")
       return
     }
 
-    const playerToEliminate = players.find((p) => p.id === playerId)
+    const playerToEliminate = players.find((p) => p.playerNumber === playerNumber)
     if (!playerToEliminate) {
       alert("Player not found")
       return
     }
 
-    if (!playerToEliminate.isAlive) {
+    if (playerToEliminate.isEliminated) {
       alert("Player is already eliminated")
       return
     }
 
     // Start elimination animation
-    setEliminatingPlayer(playerId)
+    setEliminatingPlayer(playerNumber)
 
-    setTimeout(() => {
-      setPlayers((prev) =>
-        prev.map((p) => (p.id === playerId ? { ...p, isAlive: false, eliminatedAt: Date.now() } : p)),
-      )
-      setEliminatingPlayer(null)
-      setEliminationTarget("")
-    }, 2000)
+    try {
+      const response = await fetch('/api/players', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ playerNumber }),
+      });
+
+      const updatedPlayer = await response.json();
+      setPlayers(prev =>
+        prev.map(p =>
+          p.playerNumber === playerNumber
+            ? { ...p, isEliminated: true, eliminatedAt: Date.now() }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error('Failed to eliminate player:', error);
+      alert('Failed to eliminate player. Please try again.');
+    } finally {
+      setTimeout(() => {
+        setEliminatingPlayer(null);
+        setEliminationTarget("");
+      }, 2000);
+    }
   }
 
-  const alivePlayers = players.filter((p) => p.isAlive)
-  const eliminatedCount = players.filter((p) => !p.isAlive).length
+  const alivePlayers = players.filter((p) => !p.isEliminated)
+  const eliminatedCount = players.filter((p) => p.isEliminated).length
 
   if (mode === "select") {
     return (
@@ -322,7 +341,7 @@ export default function SquidGameElimination() {
       {mode === "player" && (
         <div className="mb-6 flex justify-between items-center">
           <div className="text-green-400 digital-font">
-            Welcome, {currentPlayer?.name} (#{currentPlayer?.id.toString().padStart(3, "0")})
+            Welcome, {currentPlayer?.name} (#{currentPlayer?.playerNumber.toString().padStart(3, "0")})
           </div>
           <Button
             onClick={() => {
