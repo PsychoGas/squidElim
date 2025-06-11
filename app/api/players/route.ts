@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { players } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export async function GET() {
   try {
@@ -17,8 +17,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, avatar } = body;
 
-    // Get the next player number
-    const lastPlayer = await db.select().from(players).orderBy(players.playerNumber).limit(1);
+    // Get the next player number (highest + 1)
+    const lastPlayer = await db.select().from(players).orderBy(desc(players.playerNumber)).limit(1);
     const nextPlayerNumber = lastPlayer.length > 0 ? lastPlayer[0].playerNumber + 1 : 1;
 
     const newPlayer = await db.insert(players).values({
