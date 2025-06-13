@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { Upload, Users, Settings, Eye, EyeOff } from "lucide-react"
+import { Users, Settings, Eye, EyeOff } from "lucide-react"
 import { DiamondGrid } from "@/components/diamond-grid"
 
 interface Player {
@@ -26,16 +26,30 @@ export default function SquidGameElimination() {
   const [showPin, setShowPin] = useState(false)
   const [eliminationTarget, setEliminationTarget] = useState("")
   const [newPlayerName, setNewPlayerName] = useState("")
-  const [newPlayerAvatar, setNewPlayerAvatar] = useState("")
   const [eliminatingPlayer, setEliminatingPlayer] = useState<number | null>(null)
 
-  // Load data from API on mount
+  // Load data from API and check local storage on mount
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
         const response = await fetch('/api/players');
         const data = await response.json();
         setPlayers(data);
+
+        // Check if there's a saved player in localStorage
+        const savedCurrentPlayer = localStorage.getItem("squidGameCurrentPlayer")
+        if (savedCurrentPlayer) {
+          const parsedPlayer = JSON.parse(savedCurrentPlayer)
+          // Verify the player still exists in the database
+          const playerExists = data.some((p: Player) => p.id === parsedPlayer.id)
+          if (playerExists) {
+            setCurrentPlayer(parsedPlayer)
+            setMode("player")
+          } else {
+            // If player no longer exists in database, clear localStorage
+            localStorage.removeItem("squidGameCurrentPlayer")
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch players:', error);
       }
@@ -44,49 +58,25 @@ export default function SquidGameElimination() {
     fetchPlayers();
   }, []);
 
-  // Load current player from localStorage on mount
-  useEffect(() => {
-    const savedCurrentPlayer = localStorage.getItem("squidGameCurrentPlayer")
-    if (savedCurrentPlayer) {
-      setCurrentPlayer(JSON.parse(savedCurrentPlayer))
-      setMode("player")
-    }
-  }, [])
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setNewPlayerAvatar(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
   const registerPlayer = async () => {
     if (!newPlayerName.trim()) return
 
     try {
-      const response = await fetch('/api/players', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newPlayerName.trim(),
-          avatar: newPlayerAvatar || "/placeholder.svg?height=100&width=100",
-        }),
-      });
+      const response = await fetch('/api/players');
+      const allPlayers = await response.json();
+      const player = allPlayers.find((p: Player) => p.name.toLowerCase() === newPlayerName.trim().toLowerCase());
+      
+      if (!player) {
+        alert('Player not found. Please check your username.');
+        return;
+      }
 
-      const newPlayer = await response.json();
-      setPlayers(prev => [...prev, newPlayer]);
-      setCurrentPlayer(newPlayer);
-      localStorage.setItem("squidGameCurrentPlayer", JSON.stringify(newPlayer));
+      setCurrentPlayer(player);
+      localStorage.setItem("squidGameCurrentPlayer", JSON.stringify(player));
       setMode("player");
     } catch (error) {
-      console.error('Failed to register player:', error);
-      alert('Failed to register player. Please try again.');
+      console.error('Failed to find player:', error);
+      alert('Failed to find player. Please try again.');
     }
   }
 
@@ -159,7 +149,16 @@ export default function SquidGameElimination() {
           <h1 className="text-6xl font-bold text-green-400 digital-font tracking-wider mb-12">SQUID GAME</h1>
           <div className="space-y-4">
             <Button
-              onClick={() => setMode("register")}
+              onClick={() => {
+                // If there's a saved player, go directly to player mode
+                const savedPlayer = localStorage.getItem("squidGameCurrentPlayer")
+                if (savedPlayer) {
+                  setCurrentPlayer(JSON.parse(savedPlayer))
+                  setMode("player")
+                } else {
+                  setMode("register")
+                }
+              }}
               className="w-64 h-16 text-xl bg-green-600 hover:bg-green-700 text-black font-bold"
             >
               <Users className="mr-2" />
@@ -182,43 +181,16 @@ export default function SquidGameElimination() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <Card className="w-96 p-6 bg-gray-900 border-green-400">
-          <h2 className="text-2xl font-bold text-green-400 text-center mb-6 digital-font">PLAYER REGISTRATION</h2>
+          <h2 className="text-2xl font-bold text-green-400 text-center mb-6 digital-font">PLAYER LOGIN</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-green-400 mb-2 digital-font">Name:</label>
+              <label className="block text-green-400 mb-2 digital-font">Username:</label>
               <Input
                 value={newPlayerName}
                 onChange={(e) => setNewPlayerName(e.target.value)}
                 className="bg-black border-green-400 text-green-400"
-                placeholder="Enter your name"
+                placeholder="Enter your username"
               />
-            </div>
-            <div>
-              <label className="block text-green-400 mb-2 digital-font">Avatar:</label>
-              <div className="flex items-center space-x-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="avatar-upload"
-                />
-                <label
-                  htmlFor="avatar-upload"
-                  className="flex items-center justify-center w-20 h-20 border-2 border-green-400 border-dashed cursor-pointer hover:bg-green-400/10"
-                >
-                  {newPlayerAvatar ? (
-                    <img
-                      src={newPlayerAvatar || "/placeholder.svg"}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Upload className="text-green-400" />
-                  )}
-                </label>
-                <span className="text-green-400 text-sm">Upload Photo</span>
-              </div>
             </div>
             <div className="flex space-x-2 pt-4">
               <Button
