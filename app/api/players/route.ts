@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { players } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { broadcastElimination } from '../eliminations/route';
 
 export async function GET() {
   try {
@@ -44,6 +45,9 @@ export async function PATCH(request: Request) {
       .set({ isEliminated: true })
       .where(eq(players.playerNumber, playerNumber))
       .returning();
+
+    // Broadcast the elimination to all connected clients
+    await broadcastElimination(playerNumber);
 
     return NextResponse.json(updatedPlayer[0]);
   } catch (error) {
