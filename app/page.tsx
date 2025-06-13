@@ -58,6 +58,22 @@ export default function SquidGameElimination() {
     fetchPlayers();
   }, []);
 
+  // Add SSE subscription for live eliminations
+  useEffect(() => {
+    const eventSource = new EventSource('/api/eliminations');
+    eventSource.onmessage = (event) => {
+      const { playerNumber } = JSON.parse(event.data);
+      setPlayers(prev =>
+        prev.map(p =>
+          p.playerNumber === playerNumber
+            ? { ...p, isEliminated: true, eliminatedAt: Date.now() }
+            : p
+        )
+      );
+    };
+    return () => eventSource.close();
+  }, []);
+
   const registerPlayer = async () => {
     if (!newPlayerName.trim()) return
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React from "react"
 import { motion } from "framer-motion"
 
 interface Player {
@@ -17,48 +17,16 @@ interface DiamondGridProps {
   eliminatingPlayer: number | null
 }
 
-export function DiamondGrid({ players: initialPlayers, eliminatingPlayer: initialEliminatingPlayer }: DiamondGridProps) {
-  const [players, setPlayers] = useState(initialPlayers)
-  const [eliminatingPlayer, setEliminatingPlayer] = useState<number | null>(initialEliminatingPlayer)
-
+export function DiamondGrid({ players, eliminatingPlayer }: DiamondGridProps) {
   // Calculate grid dimensions based on viewport
-  const [dimensions, setDimensions] = useState({
+  const [dimensions, setDimensions] = React.useState({
     columns: 8,
     size: 100,
     gap: 20,
   })
 
-  // Listen for elimination events
-  useEffect(() => {
-    const eventSource = new EventSource('/api/eliminations')
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      const { playerNumber } = data
-
-      // Update the eliminating player state for animation
-      setEliminatingPlayer(playerNumber)
-
-      // Update the players state after a short delay to show the animation
-      setTimeout(() => {
-        setPlayers(prevPlayers => 
-          prevPlayers.map(player => 
-            player.playerNumber === playerNumber 
-              ? { ...player, isEliminated: true }
-              : player
-          )
-        )
-        setEliminatingPlayer(null)
-      }, 2000)
-    }
-
-    return () => {
-      eventSource.close()
-    }
-  }, [])
-
   // Update dimensions on window resize
-  useEffect(() => {
+  React.useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth
       if (width < 640) {
